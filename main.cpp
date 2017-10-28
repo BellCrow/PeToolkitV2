@@ -1,8 +1,8 @@
-#include "RemoteProcess.h"
-#include "DllOnDisk.h"
-
 #include <iostream>
 #include <memory>
+
+#include "RemoteProcess.h"
+#include "DllOnDisk.h"
 #include "Util.h"
 #include "RemoteImage.h"
 
@@ -10,10 +10,11 @@ int main()
 {
 	try
 	{
-		DllOnDisk* ddod = new DllOnDisk();
-		ddod->LoadDllFromDisk("C:\\kernel32.dll");
-		ddod->PrintDllImports(true);
-		ddod->PrintDllExports();
+		RemoteImage* remImage = new RemoteImage();
+		remImage->OpenRemoteProcess("chrome.exe");
+		void* remSectionBase = nullptr;
+		auto sectionContent = remImage->GetDataDirectoryContentByIndex("kernel32.dll", 6, &remSectionBase);
+		cout << "blub" << endl;
 	}
 	catch(string message)
 	{

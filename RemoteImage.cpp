@@ -8,7 +8,6 @@ RemoteImage::RemoteImage()
 	knownModuleBases = new vector<MAPPED_DLL>();
 }
 
-
 RemoteImage::~RemoteImage()
 {
 	delete remProcess;
@@ -20,26 +19,110 @@ void RemoteImage::OpenRemoteProcess(string remoteProcess)
 	remProcess->OpenRemoteProcess(remoteProcess);
 }
 
-unique_ptr<Util::ManagedBuffer> RemoteImage::GetDosHeader(string remoteModule, void** remoteBase)
+unique_ptr<Util::ManagedBuffer<IMAGE_DOS_HEADER*>> RemoteImage::GetDosHeader(string remoteModule, void** remoteBase)
 {
 	int bufferSize = 0;
-	unique_ptr<Util::ManagedBuffer> ret;
+	UNIQUE_MANAGED(IMAGE_DOS_HEADER*) ret;
 	void* dosHeaderBase = nullptr;
 
-	ret = make_unique<Util::ManagedBuffer>();
+	ret = make_unique<Util::ManagedBuffer<IMAGE_DOS_HEADER*>>();
 	dosHeaderBase = GetRemoteModuleBase(remoteModule);
-	//ret->SetContent(this->remProcess->ReadBuffer())
+	ret->SetContent(reinterpret_cast<IMAGE_DOS_HEADER*>(this->remProcess->ReadBuffer(dosHeaderBase, sizeof(IMAGE_DOS_HEADER))));
+	ret->SetBufferSize(sizeof(IMAGE_DOS_HEADER));
+	if (remoteBase != nullptr)
+	{
+		*remoteBase = dosHeaderBase;
+	}
 	return ret;
 }
 
-unique_ptr<Util::ManagedBuffer> RemoteImage::GetNtHeader(string remoteModule, void** remoteBase)
+unique_ptr<Util::ManagedBuffer<IMAGE_NT_HEADERS*>> RemoteImage::GetNtHeader(string remoteModule, void** remoteBase)
 {
-	return nullptr;
+	void* dosBaseAddress = nullptr;
+	void* ntBase = nullptr;
+	UNIQUE_MANAGED(IMAGE_DOS_HEADER*) dosHeader = GetDosHeader(remoteModule, &dosBaseAddress);
+	UNIQUE_MANAGED(IMAGE_NT_HEADERS*) ntHeader = make_unique<Util::ManagedBuffer<IMAGE_NT_HEADERS*>>();
+	ntBase = RESOLVE_RVA(void*, dosBaseAddress, dosHeader->GetContent()->e_lfanew);
+
+	ntHeader->SetContent(reinterpret_cast<IMAGE_NT_HEADERS*>(this->remProcess->ReadBuffer(ntBase, sizeof(IMAGE_NT_HEADERS))));
+	ntHeader->SetBufferSize(sizeof(IMAGE_SECTION_HEADER));
+	if(remoteBase != nullptr)
+	{
+		*remoteBase = ntBase;
+	}
+	return ntHeader;
 }
+
+unique_ptr<Util::ManagedBuffer<IMAGE_SECTION_HEADER*>> RemoteImage::GetSectionHeaderByIndex(string remoteModule, int index, void** remoteBase)
+{
+	void* remoteImagebase = nullptr;
+	void* remoteNtHeaderBase = nullptr;
+	IMAGE_SECTION_HEADER* sectionBaseRemoteAddress = nullptr;
+	
+	UNIQUE_MANAGED(IMAGE_SECTION_HEADER*) sectionContent = make_unique<Util::ManagedBuffer<IMAGE_SECTION_HEADER*>>();
+
+	UNIQUE_MANAGED(IMAGE_NT_HEADERS*) ntHeader = GetNtHeader(remoteModule,&remoteNtHeaderBase);
+
+	remoteImagebase = GetRemoteModuleBase(remoteModule);
+	if(ntHeader->GetContent()->FileHeader.NumberOfSections <= index)
+	{
+		throw string("Desired section index ist out bounds for remote image");
+	}
+	
+	//get address of the first sectionHeader directly after the nt Header
+	sectionBaseRemoteAddress = RESOLVE_RVA(IMAGE_SECTION_HEADER*, remoteNtHeaderBase, sizeof(ntHeader->GetContent()->Signature));
+	sectionBaseRemoteAddress = RESOLVE_RVA(IMAGE_SECTION_HEADER*, sectionBaseRemoteAddress, sizeof(ntHeader->GetContent()->FileHeader));
+	sectionBaseRemoteAddress = RESOLVE_RVA(IMAGE_SECTION_HEADER*, sectionBaseRemoteAddress, ntHeader->GetContent()->FileHeader.SizeOfOptionalHeader);
+
+	sectionBaseRemoteAddress = reinterpret_cast<IMAGE_SECTION_HEADER*>(&sectionBaseRemoteAddress[index]);
+	//read the sectionHeader content
+	sectionContent->SetContent(reinterpret_cast<IMAGE_SECTION_HEADER*>(reinterpret_cast<IMAGE_SECTION_HEADER*>(remProcess->ReadBuffer(sectionBaseRemoteAddress, sizeof(IMAGE_SECTION_HEADER)))));
+	sectionContent->SetBufferSize(sizeof(IMAGE_SECTION_HEADER));
+	if(remoteBase != nullptr)
+	{
+		*remoteBase = sectionBaseRemoteAddress;
+	}
+	return sectionContent;
+}
+
+unique_ptr<Util::ManagedBuffer<void*>> RemoteImage::GetSectionContentByIndex(string remoteModule, int index, void** remoteBase)
+{
+	void* imageBase = GetRemoteModuleBase(remoteModule);
+	auto sectionHeader = GetSectionHeaderByIndex(remoteModule, index, nullptr);
+	UNIQUE_MANAGED(void*) sectionContent = make_unique<Util::ManagedBuffer<void*>>();
+	void* sectionBaseAddress = RESOLVE_RVA(void*, imageBase, sectionHeader->GetContent()->VirtualAddress);
+
+	sectionContent->SetContent(remProcess->ReadBuffer(sectionBaseAddress, sectionHeader->GetContent()->Misc.VirtualSize));
+	sectionContent->SetBufferSize(sectionHeader->GetContent()->Misc.VirtualSize);
+	if(remoteBase != nullptr)
+	{
+		*remoteBase = sectionBaseAddress;
+	}
+	return sectionContent;
+}
+
+unique_ptr<Util::ManagedBuffer<void*>> RemoteImage::GetDataDirectoryContentByIndex(string remoteModule, unsigned int index, void** remoteBase)
+{
+	void* remoteModuleBase = GetRemoteModuleBase(remoteModule);
+	UNIQUE_MANAGED(IMAGE_NT_HEADERS*) ntHeader = GetNtHeader(remoteModule, nullptr);
+	void* ddHeaderAddress = nullptr;
+	UNIQUE_MANAGED(void*) ddContent = make_unique<Util::ManagedBuffer<void*>>();
+	
+	if(ntHeader->GetContent()->OptionalHeader.NumberOfRvaAndSizes <= index)
+	{
+		throw string("Desired Datadirectory index is out of bounds for the remote image");
+	}
+
+	ddHeaderAddress = RESOLVE_RVA(void*, remoteModuleBase, ntHeader->GetContent()->OptionalHeader.DataDirectory[index].VirtualAddress);
+	ddContent->SetContent(remProcess->ReadBuffer(ddHeaderAddress, ntHeader->GetContent()->OptionalHeader.DataDirectory[index].Size));
+	ddContent->SetBufferSize(ntHeader->GetContent()->OptionalHeader.DataDirectory[index].Size);
+
+	return ddContent;
+}
+
 
 void* RemoteImage::GetRemoteModuleBase(string moduleName)
 {
-
 	//first check the already known addresses
 	for(vector<MAPPED_DLL>::iterator it = knownModuleBases->begin(); it != knownModuleBases->end();it++)
 	{
