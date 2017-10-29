@@ -108,6 +108,7 @@ void* DllOnDisk::ResolveRvaInRawFile(int rva)
 	return RESOLVE_RVA(void*, this->rawFile->GetFilePointer(), rva);
 }
 
+
 void DllOnDisk::PrintDllImports(bool printImportedFunctions)
 {
 	CheckFileMapped();
@@ -202,6 +203,7 @@ void DllOnDisk::PrintDllExports()
 	cout << "==========================================================" << endl;
 }
 
+
 void DllOnDisk::LoadDllFromDisk(const string dllPath)
 {
 	rawFile = new DiskFile();
@@ -257,11 +259,20 @@ void DllOnDisk::MapRawFile()
 	this->isFileMapped = true;
 }
 
-
 void DllOnDisk::CheckFileMapped()
 {
 	if (!this->isFileMapped)
 	{
 		throw string("File not mapped. Cant interaact using this method");
 	}
+}
+
+byte* DllOnDisk::GetMappedContent()
+{
+	return mappedFileContent;
+}
+
+int DllOnDisk::GetMappedContentSize()
+{
+	return GetNtHeader()->OptionalHeader.SizeOfImage;
 }

@@ -5,15 +5,22 @@
 #include "DllOnDisk.h"
 #include "Util.h"
 #include "RemoteImage.h"
+#include "ManualInjector.h"
 
 int main()
 {
 	try
 	{
+		
 		RemoteImage* remImage = new RemoteImage();
 		remImage->OpenRemoteProcess("chrome.exe");
-		void* remSectionBase = nullptr;
-		auto sectionContent = remImage->GetDataDirectoryContentByIndex("kernel32.dll", 6, &remSectionBase);
+		DllOnDisk* dll = new DllOnDisk();
+		dll->LoadDllFromDisk("C:\\hw.dll");
+
+		ManualInjector* mi = new ManualInjector(remImage);
+
+		mi->InjectDll(dll);
+
 		cout << "blub" << endl;
 	}
 	catch(string message)

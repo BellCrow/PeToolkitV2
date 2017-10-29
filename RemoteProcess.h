@@ -25,12 +25,17 @@ public:
 
 	void OpenRemoteProcess(string processName);
 
+	#pragma region Read values
+
 	int ReadInt(void* readAddress);
 	DWORD ReadDword(void* readAddress);
 	long long ReadLongLong(void* readAddress);
 	string ReadAnsiString(void* readAddress,int maxLenght);
 	byte* ReadBuffer(void* readAddress, int bufferSize);
-	
+
+	#pragma endregion
+
+	#pragma region Write Values
 
 	void WriteInt(void* writeAddress, int value);
 	void WriteDword(void* writeAddress, DWORD value);
@@ -38,6 +43,11 @@ public:
 	void WriteAnsiString(void* writeAddress, string value);
 	void WriteBuffer(void* writeAddress, void* buffer, int bufferSize);
 
+	#pragma endregion
+	
+	#pragma region Allocation	
+	void* AllocSection(int sectionSize, DWORD sectionPermission);
+	#pragma endregion
 
 	static int GetPidFromName(string processName);
 };

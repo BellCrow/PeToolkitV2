@@ -7,6 +7,7 @@
 #include "RemoteProcess.h"
 #include "PeHelper.h"
 #include <vector>
+#include "DllOnDisk.h"
 using namespace std;
 
 typedef struct _MAPPED_DLL
@@ -33,6 +34,11 @@ public:
 	unique_ptr <Util::ManagedBuffer<void*>> GetSectionContentByIndex(string remoteModule, int index, void** remoteBase);
 
 	unique_ptr <Util::ManagedBuffer<void*>> GetDataDirectoryContentByIndex(string remoteModule, unsigned int index, void** remoteBase);
+
+
 	void* GetRemoteModuleBase(string moduleName);
+	void AddModuleBaseMapping(void* remoteAddress, string remoteModuleName);
+
+	void* AllocSpaceForDll(DllOnDisk*& dll);
 };
 

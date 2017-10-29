@@ -1,7 +1,6 @@
 #include "RemoteImage.h"
 #include <algorithm>
 
-
 RemoteImage::RemoteImage()
 {
 	remProcess = new RemoteProcess();
@@ -120,9 +119,12 @@ unique_ptr<Util::ManagedBuffer<void*>> RemoteImage::GetDataDirectoryContentByInd
 	return ddContent;
 }
 
-
 void* RemoteImage::GetRemoteModuleBase(string moduleName)
 {
+	//tranform the given modulename to upper case 
+	//no case sensitive
+	transform(moduleName.begin(), moduleName.end(), moduleName.begin(), toupper);
+
 	//first check the already known addresses
 	for(vector<MAPPED_DLL>::iterator it = knownModuleBases->begin(); it != knownModuleBases->end();it++)
 	{
@@ -145,7 +147,7 @@ void* RemoteImage::GetRemoteModuleBase(string moduleName)
 	MODULEENTRY32 moduleInfoStorage = { 0 };
 	string compareString;
 
-	transform(moduleName.begin(), moduleName.end(), moduleName.begin(), toupper);
+	
 
 	enumHandle = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, remoteProcessPid);
 	if (enumHandle == INVALID_HANDLE_VALUE)
@@ -186,5 +188,23 @@ void* RemoteImage::GetRemoteModuleBase(string moduleName)
 	{
 		return reinterpret_cast<void*>(-1);
 	}
+	//add the newly needed modulebase to the list of known bases
+	MAPPED_DLL adder;
+	adder.remoteBase = moduleInfoStorage.modBaseAddr;
+	adder.moduleName = moduleName;
+	knownModuleBases->push_back(adder);
 	return moduleInfoStorage.modBaseAddr;
+}
+
+void RemoteImage::AddModuleBaseMapping(void* remoteAddress, string remoteModuleName)
+{
+	MAPPED_DLL adder;
+	adder.remoteBase = remoteAddress;
+	adder.moduleName = remoteModuleName;
+	knownModuleBases->push_back(adder);
+}
+
+void* RemoteImage::AllocSpaceForDll(DllOnDisk*& dll)
+{
+	return remProcess->AllocSection(dll->GetNtHeader()->OptionalHeader.SizeOfImage, PAGE_EXECUTE_READWRITE);
 }

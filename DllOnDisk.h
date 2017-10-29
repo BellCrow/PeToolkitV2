@@ -36,9 +36,11 @@ public:
 	void* ResolveRvaInRawFile(int rva);
 
 
+	byte* GetMappedContent();
+	int GetMappedContentSize();
+
 	//DllInfos
 	void PrintDllImports(bool printImportedFunctions);
-
 	void PrintDllExports();
 };
 

@@ -16,6 +16,14 @@ RemoteProcess::~RemoteProcess()
 	}
 }
 
+void RemoteProcess::CheckOpened()
+{
+	if (!this->processOpened)
+	{
+		throw string("Process not opened. Cant interact with process");
+	}
+}
+
 int RemoteProcess::GetRemotePid()
 {
 	return remotePid;
@@ -48,7 +56,7 @@ void RemoteProcess::OpenRemoteProcess(string processName)
 	this->processOpened = true;
 }
 
-
+#pragma region Read Values
 int RemoteProcess::ReadInt(void* readAddress)
 {
 	CheckOpened();
@@ -101,6 +109,7 @@ string RemoteProcess::ReadAnsiString(void * readAddress, int maxLenght)
 		{
 			throw string("Could not read remote string");
 		}
+
 		if (tempByte == 0)
 			break;
 		ret += tempByte;
@@ -135,8 +144,9 @@ byte* RemoteProcess::ReadBuffer(void* readAddress, int bufferSize)
 	}
 	return ret;
 }
+#pragma endregion
 
-
+#pragma region Write Values
 void RemoteProcess::WriteInt(void* writeAddress, int value)
 {
 	CheckOpened();
@@ -171,14 +181,22 @@ void RemoteProcess::WriteBuffer(void* writeAddress, void* buffer, int bufferSize
 	}
 }
 
+#pragma endregion
 
-void RemoteProcess::CheckOpened()
+#pragma region Allocation
+
+void* RemoteProcess::AllocSection(int sectionSize, DWORD sectionPermission)
 {
-	if (!this->processOpened)
+	CheckOpened();
+	void* ret = nullptr;
+	if((ret = VirtualAllocEx(processHandle,nullptr,sectionSize,MEM_COMMIT|MEM_RESERVE,sectionPermission)) == nullptr)
 	{
-		throw string("Process not opened. Cant read/write values");
+		throw string("Error allocating section in remoteProcess");
 	}
+	return ret;
 }
+
+#pragma endregion
 
 //static
 int RemoteProcess::GetPidFromName(string processName)

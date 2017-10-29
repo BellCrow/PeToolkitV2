@@ -3,6 +3,13 @@
 
 #define UNIQUE_MANAGED(dataType) unique_ptr<Util::ManagedBuffer<dataType>>
 
+//used to make sure, that we get a 32 bit datatype in x86 mode and a 64bit datatype in x64 mode
+#ifdef _WIN64
+	#define BITDYNAMIC __int64
+#else
+	#define BITDYNAMIC __int32
+#endif
+
 class Util
 {
 public:
