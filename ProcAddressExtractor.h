@@ -2,7 +2,6 @@
 #include "Util.h"
 #include "RemoteImage.h"
 #include "DllSearcher.h"
-#include "ManualInjector.h"
 #include <Windows.h>
 #include <memory>
 #include <string>
@@ -13,13 +12,13 @@ class ProcAddressExtractor
 	RemoteImage* importProcess;
 	string currentImportModule;
 	BITDYNAMIC currentModuleBase;
-	BITDYNAMIC currentImageBase;
+	BITDYNAMIC currentExportDirBase;
 	UNIQUE_MANAGED(void*) currentRemoteExportDir;
 public:
 	ProcAddressExtractor(RemoteImage* importFromProcess);
 	~ProcAddressExtractor();
 
-	BITDYNAMIC GetProcAddress(string moduleName, string funcName);
-	BITDYNAMIC GetProcAddress(string moduleName, int ordinal);
+	BITDYNAMIC* GetProcAddress(string moduleName, string funcName);
+	BITDYNAMIC* GetProcAddress(string moduleName, int ordinal);
 };
 

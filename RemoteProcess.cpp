@@ -196,6 +196,18 @@ void* RemoteProcess::AllocSection(int sectionSize, DWORD sectionPermission)
 	return ret;
 }
 
+HANDLE RemoteProcess::CreateThread(void* startAddress, int arg)
+{
+	CheckOpened();
+	return CreateRemoteThread(processHandle,
+		nullptr,
+		0,
+		(LPTHREAD_START_ROUTINE)startAddress,
+		reinterpret_cast<void*>(arg),
+		0,
+		nullptr);
+}
+
 #pragma endregion
 
 //static

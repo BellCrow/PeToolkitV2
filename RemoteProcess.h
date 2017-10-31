@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <string>
 #include <TlHelp32.h>
+#include "Util.h"
 
 using namespace std;
 
@@ -48,6 +49,10 @@ public:
 	#pragma region Allocation	
 	void* AllocSection(int sectionSize, DWORD sectionPermission);
 	#pragma endregion
+
+	#pragma region remote Threading
+	HANDLE CreateThread(void* startAddress, BITDYNAMIC arg);
+	#pragma endregion 
 
 	static int GetPidFromName(string processName);
 };

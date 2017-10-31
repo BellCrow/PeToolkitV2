@@ -108,6 +108,11 @@ void* DllOnDisk::ResolveRvaInRawFile(int rva)
 	return RESOLVE_RVA(void*, this->rawFile->GetFilePointer(), rva);
 }
 
+int DllOnDisk::GetDllMainRva()
+{
+	return GetNtHeader()->OptionalHeader.AddressOfEntryPoint;
+}
+
 
 void DllOnDisk::PrintDllImports(bool printImportedFunctions)
 {
@@ -191,7 +196,7 @@ void DllOnDisk::PrintDllExports()
 	for (namelessFuncCount = 0; namelessFuncCount < exportDirectory->NumberOfFunctions - exportDirectory->NumberOfNames;
 	     namelessFuncCount++)
 	{
-		cout << hex << functionAddressBase[namelessFuncCount] << "\t || [unknown]" << endl;
+		//cout << hex << functionAddressBase[namelessFuncCount] << "\t || [unknown]" << endl;
 	}
 	for (unsigned int i = 0; i < exportDirectory->NumberOfNames; i++)
 	{

@@ -115,8 +115,16 @@ unique_ptr<Util::ManagedBuffer<void*>> RemoteImage::GetDataDirectoryContentByInd
 	ddHeaderAddress = RESOLVE_RVA(void*, remoteModuleBase, ntHeader->GetContent()->OptionalHeader.DataDirectory[index].VirtualAddress);
 	ddContent->SetContent(remProcess->ReadBuffer(ddHeaderAddress, ntHeader->GetContent()->OptionalHeader.DataDirectory[index].Size));
 	ddContent->SetBufferSize(ntHeader->GetContent()->OptionalHeader.DataDirectory[index].Size);
-
+	if(remoteBase != nullptr)
+	{
+		*remoteBase = ddHeaderAddress;
+	}
 	return ddContent;
+}
+
+RemoteProcess* RemoteImage::GetRemProcInstance()
+{
+	return remProcess;
 }
 
 void* RemoteImage::GetRemoteModuleBase(string moduleName)
@@ -205,4 +213,9 @@ void RemoteImage::AddModuleBaseMapping(void* remoteAddress, string remoteModuleN
 void* RemoteImage::AllocSpaceForDll(DllOnDisk*& dll)
 {
 	return remProcess->AllocSection(dll->GetNtHeader()->OptionalHeader.SizeOfImage, PAGE_EXECUTE_READWRITE);
+}
+
+void RemoteImage::WriteDllToSection(DllOnDisk*& preparedDll, void* remoteSectionBase)
+{
+	remProcess->WriteBuffer(remoteSectionBase, preparedDll->GetMappedContent(), preparedDll->GetMappedContentSize());
 }

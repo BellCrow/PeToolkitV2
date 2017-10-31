@@ -7,6 +7,7 @@
 ManualInjector::ManualInjector(RemoteImage*& processToInjectInto)
 {
 	remImage = processToInjectInto;
+	procEx = new ProcAddressExtractor(remImage);
 }
 
 
@@ -17,13 +18,58 @@ ManualInjector::~ManualInjector()
 
 void ManualInjector::InjectDll(DllOnDisk*& dllToInject)
 {
-	void* remoteSectionBase = nullptr;
 
+#ifdef _WIN64
+	byte bootStrapper[] =
+	{ 0x50, 0x48, 0x89, 0xC8, 0x51, 0x52, 0x41, 0x51, 0x41, 0x52, 0x48, 0x8B, 0x08, 0x48, 0x8B, 0x50, 0x08, 0x4C, 0x8B, 0x48, 0x10, 0x48, 0x8B, 0x40, 0x18, 0x48, 0x83, 0xEC, 0x20, 0xFF, 0xD0, 0xC3 };
+	int bootStrapSize = sizeof(bootStrapper);
+#else
+	byte bootStrapper[] =
+	{
+		0x55				//push ebp 0x55
+		, 0x89, 0xE5         //mov ebp,esp
+		, 0x60				//pushal
+		, 0x8B, 0x45, 0x08	//mov eax,[ebp+4]
+		, 0xFF, 0x30	   //push [eax]
+		, 0xFF, 0x70, 0x04 //push [eax+4]
+		, 0xFF, 0x70, 0x08 //push [eax+8]
+		, 0x8B, 0x40, 0xC //mov eax,[eax+c]
+		, 0xFF, 0xD0	   //call eax
+		, 0x61				//popal
+		, 0x89, 0xEC		//mov esp,ebp
+		, 0x5D				//pop ebp
+		, 0x31, 0xC0		//xor eax,eax
+							//, 0xFE, 0xC0		//inc al
+		, 0xC3				//ret (will return 1 here)
+	};
+	int bootStrapSize = sizeof(bootStrapper);
+#endif
+	void* remoteSectionBase = nullptr;
+	BOOTSTRAPPER_DATA bootStrapData = {0};
 	//reserve the neccesary space in the remoteImage
 	remoteSectionBase = remImage->AllocSpaceForDll(dllToInject);
 
 	ResolveRelocations(dllToInject, remoteSectionBase);
 	ResolveImports(dllToInject);
+
+	remImage->WriteDllToSection(dllToInject, remoteSectionBase);
+
+	void* bootStrapSection = remImage->AllocSpaceForDll(dllToInject);
+
+	bootStrapData.fdwReason = DLL_PROCESS_ATTACH;
+	bootStrapData.hInstance = reinterpret_cast<BITDYNAMIC>(remoteSectionBase);
+	bootStrapData.DllMainAddress = RESOLVE_RVA(void*,remoteSectionBase, dllToInject->GetDllMainRva());
+
+	remImage->GetRemProcInstance()->WriteBuffer(bootStrapSection,reinterpret_cast<void*>(&bootStrapData), sizeof(bootStrapData));
+
+	remImage->GetRemProcInstance()->WriteBuffer(reinterpret_cast<byte*>(bootStrapSection) + sizeof(bootStrapData) + 20, reinterpret_cast<void*>(&bootStrapper), bootStrapSize);
+
+	HANDLE bootThreadHandle = remImage->GetRemProcInstance()->CreateThread(reinterpret_cast<byte*>(bootStrapSection) + sizeof(bootStrapData) + 20, reinterpret_cast<int>(bootStrapSection));
+	
+	WaitForSingleObject(bootThreadHandle,INFINITE);
+	DWORD retCode = 0;
+	GetExitCodeThread(bootThreadHandle, &retCode);
+	cout << "InjectionThread terminating with Return Code:" << retCode << endl;
 }
 
 
@@ -86,24 +132,61 @@ void ManualInjector::ResolveRelocEntry(void* blockEntry,int pageOffset, BITDYNAM
 void ManualInjector::ResolveImports(DllOnDisk*& dllToInject)
 {
 	string currentImportDll;
+	IMAGE_IMPORT_DESCRIPTOR* importIterator = reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(dllToInject->GetDataDirectoryBaseByIndex(IMAGE_DIRECTORY_ENTRY_IMPORT, nullptr));
+	currentImportDll = string(reinterpret_cast<char*>(dllToInject->ResolveRvaInMappedDll(importIterator->Name)));
+
+	//load the dll in te process, if it ist already loaded
+	if(remImage->GetRemoteModuleBase(currentImportDll) == reinterpret_cast<void*>(-1))
+	{
+		DllSearcher* dlls = new DllSearcher();
+		auto recDll = dlls->ReadDllFromPathList(currentImportDll);
+		this->InjectDll(recDll);
+	}
+	while(importIterator->Characteristics != 0)
+	{
+		ImportSingleDll(dllToInject, currentImportDll, importIterator);
+		importIterator++;
+		currentImportDll = string(reinterpret_cast<char*>(dllToInject->ResolveRvaInMappedDll(importIterator->Name)));
+	}
 	
 }
 
-void ManualInjector::ImportSingleDll(DllOnDisk*& dllToInject, BITDYNAMIC* dllImports)
+void ManualInjector::ImportSingleDll(DllOnDisk*& dllToInject, string dllName, IMAGE_IMPORT_DESCRIPTOR* importIterator)
 {
 	IMAGE_IMPORT_BY_NAME* currentNamedImport = nullptr;
-	//iterating overtheoffsets to the hint/nameTables
+	string functionToImport;
+	BITDYNAMIC* dllImports = reinterpret_cast<BITDYNAMIC*>(dllToInject->ResolveRvaInMappedDll(importIterator->OriginalFirstThunk));
+	BITDYNAMIC* addressToFill = reinterpret_cast<BITDYNAMIC*>(dllToInject->ResolveRvaInMappedDll(importIterator->FirstThunk));
+
+	//iterating over the offsets to the hint/nameTables
 	while (*dllImports != 0)
 	{
 		if (IMAGE_SNAP_BY_ORDINAL(*dllImports))
 		{
-			cout << "\tImport by Ordinal" << endl;
+			*addressToFill = reinterpret_cast<BITDYNAMIC>(procEx->GetProcAddress(dllName, static_cast<WORD>(*dllImports)));
 		}
 		else
 		{
 			currentNamedImport = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(dllToInject->ResolveRvaInMappedDll(*dllImports));
+			functionToImport = string(currentNamedImport->Name);
+			//a dot in the imported functionname means, that we aredealing with
+			//a forwarded import. e.g NTDLL.FreeTls
+			//the part in front of the . is the dll name to import from and 
+			//the part after the . is the functionname to import
+			if (functionToImport.find('.') != string::npos)
+			{
+				cout << "Found forwarded import in " << dllName << ". Imported name:" << functionToImport << endl;
+				string dllName = functionToImport.substr(0, functionToImport.find('.'));
+				string funcName = functionToImport.substr(functionToImport.find('.') + 1, functionToImport.length() - functionToImport.find('.'));
+				*addressToFill = reinterpret_cast<BITDYNAMIC>(procEx->GetProcAddress(dllName, funcName));
+			}
+			else
+			{
+				*addressToFill = reinterpret_cast<BITDYNAMIC>(procEx->GetProcAddress(dllName, functionToImport));
+			}
 		}
 		dllImports++;
+		addressToFill++;
 	}
 }
 #pragma endregion

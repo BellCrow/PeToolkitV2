@@ -35,10 +35,11 @@ public:
 
 	unique_ptr <Util::ManagedBuffer<void*>> GetDataDirectoryContentByIndex(string remoteModule, unsigned int index, void** remoteBase);
 
-
+	RemoteProcess* GetRemProcInstance();
 	void* GetRemoteModuleBase(string moduleName);
 	void AddModuleBaseMapping(void* remoteAddress, string remoteModuleName);
 
 	void* AllocSpaceForDll(DllOnDisk*& dll);
+	void WriteDllToSection(DllOnDisk*& preparedDll, void* remoteSectionBase);
 };
 
