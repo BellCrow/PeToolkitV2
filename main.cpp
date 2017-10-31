@@ -6,14 +6,13 @@
 #include "Util.h"
 #include "RemoteImage.h"
 #include "ManualInjector.h"
-
+#include "DllSearcher.h"
 int main()
 {
 	try
 	{
-		
 		RemoteImage* remImage = new RemoteImage();
-		remImage->OpenRemoteProcess("chrome.exe");
+		remImage->OpenRemoteProcess("procexp.exe");
 		DllOnDisk* dll = new DllOnDisk();
 		dll->LoadDllFromDisk("C:\\hw.dll");
 

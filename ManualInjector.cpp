@@ -1,6 +1,7 @@
 #include "ManualInjector.h"
 #include "Util.h"
 #include <iostream>
+#include "DllSearcher.h"
 
 
 ManualInjector::ManualInjector(RemoteImage*& processToInjectInto)
@@ -22,8 +23,11 @@ void ManualInjector::InjectDll(DllOnDisk*& dllToInject)
 	remoteSectionBase = remImage->AllocSpaceForDll(dllToInject);
 
 	ResolveRelocations(dllToInject, remoteSectionBase);
+	ResolveImports(dllToInject);
 }
 
+
+#pragma region Relocations
 void ManualInjector::ResolveRelocations(DllOnDisk*& dllToInject,void* remoteBase)
 {
 	void* diskImageBase = dllToInject->GetMappedContent();
@@ -74,3 +78,32 @@ void ManualInjector::ResolveRelocEntry(void* blockEntry,int pageOffset, BITDYNAM
 	writePointer = RESOLVE_RVA(BITDYNAMIC*, writePointer, relocOffset);
 	(*writePointer) += imageDelta;
 }
+
+
+#pragma endregion
+
+#pragma region Imports
+void ManualInjector::ResolveImports(DllOnDisk*& dllToInject)
+{
+	string currentImportDll;
+	
+}
+
+void ManualInjector::ImportSingleDll(DllOnDisk*& dllToInject, BITDYNAMIC* dllImports)
+{
+	IMAGE_IMPORT_BY_NAME* currentNamedImport = nullptr;
+	//iterating overtheoffsets to the hint/nameTables
+	while (*dllImports != 0)
+	{
+		if (IMAGE_SNAP_BY_ORDINAL(*dllImports))
+		{
+			cout << "\tImport by Ordinal" << endl;
+		}
+		else
+		{
+			currentNamedImport = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(dllToInject->ResolveRvaInMappedDll(*dllImports));
+		}
+		dllImports++;
+	}
+}
+#pragma endregion

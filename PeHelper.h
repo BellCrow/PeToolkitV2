@@ -21,9 +21,10 @@ enum Bitvalue
 #ifdef _WIN64
 	#define IMPORT_LOOKUP_ENTRY __int64 
 	#define SWITCH_VALUE __int64
+	#define IAT_ENTRY_TO_FILL __int64*
 #else
 	#define IMPORT_LOOKUP_ENTRY __int32 
 	#define SWITCH_VALUE __int32
+	#define IAT_ENTRY_TO_FILL __int32*
 #endif
 
-#define IAT_ENTRY_TO_FILL void*

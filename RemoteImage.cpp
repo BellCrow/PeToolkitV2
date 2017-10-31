@@ -126,7 +126,7 @@ void* RemoteImage::GetRemoteModuleBase(string moduleName)
 	transform(moduleName.begin(), moduleName.end(), moduleName.begin(), toupper);
 
 	//first check the already known addresses
-	for(vector<MAPPED_DLL>::iterator it = knownModuleBases->begin(); it != knownModuleBases->end();it++)
+	for(vector<MAPPED_DLL>::iterator it = knownModuleBases->begin(); it != knownModuleBases->end();++it)
 	{
 		if(it->moduleName == moduleName)
 		{
@@ -146,8 +146,6 @@ void* RemoteImage::GetRemoteModuleBase(string moduleName)
 	HANDLE enumHandle = nullptr;
 	MODULEENTRY32 moduleInfoStorage = { 0 };
 	string compareString;
-
-	
 
 	enumHandle = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, remoteProcessPid);
 	if (enumHandle == INVALID_HANDLE_VALUE)

@@ -42,5 +42,8 @@ public:
 	//DllInfos
 	void PrintDllImports(bool printImportedFunctions);
 	void PrintDllExports();
+
+	//dll searcher
+
 };
 
