@@ -64,12 +64,22 @@ void ManualInjector::InjectDll(DllOnDisk*& dllToInject)
 
 	remImage->GetRemProcInstance()->WriteBuffer(reinterpret_cast<byte*>(bootStrapSection) + sizeof(bootStrapData) + 20, reinterpret_cast<void*>(&bootStrapper), bootStrapSize);
 
-	HANDLE bootThreadHandle = remImage->GetRemProcInstance()->CreateThread(reinterpret_cast<byte*>(bootStrapSection) + sizeof(bootStrapData) + 20, reinterpret_cast<int>(bootStrapSection));
-	
-	WaitForSingleObject(bootThreadHandle,INFINITE);
-	DWORD retCode = 0;
-	GetExitCodeThread(bootThreadHandle, &retCode);
-	cout << "InjectionThread terminating with Return Code:" << retCode << endl;
+	if(bootStrapData.DllMainAddress != nullptr)	
+	{
+		HANDLE bootThreadHandle = remImage->GetRemProcInstance()->CreateThread(reinterpret_cast<byte*>(bootStrapSection) + sizeof(bootStrapData) + 20, reinterpret_cast<int>(bootStrapSection));
+
+		WaitForSingleObject(bootThreadHandle, INFINITE);
+		DWORD retCode = 0;
+		GetExitCodeThread(bootThreadHandle, &retCode);
+		cout << "InjectionThread terminating with Return Code:" << retCode << endl;
+	}
+	//everything seemed to have been working out.add the injected dll into the known module bases
+	//we use the name, that is also used to export stuff, as thats whats important.
+	//if the dll exports nothing, we dont naeed the name anyway
+
+	IMAGE_EXPORT_DIRECTORY* localRemImage = reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(dllToInject->GetDataDirectoryByIndex(IMAGE_DIRECTORY_ENTRY_EXPORT));
+	remImage->AddModuleBaseMapping(bootStrapSection, string(RESOLVE_RVA(char*,dllToInject->GetMappedContent(), localRemImage->Name)));
+	cout << "Finished injection" << endl;
 }
 
 

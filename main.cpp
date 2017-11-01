@@ -1,9 +1,6 @@
 #include <iostream>
-#include <memory>
 
-#include "RemoteProcess.h"
 #include "DllOnDisk.h"
-#include "Util.h"
 #include "RemoteImage.h"
 #include "ManualInjector.h"
 #include "DllSearcher.h"
@@ -22,7 +19,7 @@ int main()
 	}
 	catch(string message)
 	{
-		cout << message << endl;
+		cout <<"Exception:" << message << endl;
 	}
 	getchar();
 	return 0;

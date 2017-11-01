@@ -33,7 +33,7 @@ public:
 	long long ReadLongLong(void* readAddress);
 	string ReadAnsiString(void* readAddress,int maxLenght);
 	byte* ReadBuffer(void* readAddress, int bufferSize);
-
+	WORD ReadWord(void* readAddress);
 	#pragma endregion
 
 	#pragma region Write Values

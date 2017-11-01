@@ -29,35 +29,42 @@ BITDYNAMIC* ProcAddressExtractor::GetProcAddress(string moduleName, string funcN
 																							reinterpret_cast<void**>(&this->currentExportDirBase));
 	}
 
-	//search for name to import
-	BITDYNAMIC* funcAddress = 0;
 	IMAGE_EXPORT_DIRECTORY* exportDir = reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(currentRemoteExportDir->GetContent());
-	DWORD* nameIterator = reinterpret_cast<DWORD*>(0xFFFFFFFF);
-	int offsetToRemoteExportDir = (currentExportDirBase - currentModuleBase);
-	int nameOffset = 0;
-	//check if the desired address is inside of the already read remoteExport directory
-	if(exportDir->AddressOfNames - offsetToRemoteExportDir < currentRemoteExportDir->GetBufferSize())
-	{
-		nameIterator = RESOLVE_RVA(DWORD*, currentRemoteExportDir->GetContent(), exportDir->AddressOfNames - offsetToRemoteExportDir);
-	}
-	else
-	{
-		cout << "FORWARDED EXPORT DETECTED!!!!" << endl;
-	}
+	//search for name to import
+	DWORD* remoteFuncNameBase = RESOLVE_RVA(DWORD*,currentModuleBase,exportDir->AddressOfNames);
+	WORD* remoteOrdinalBase = RESOLVE_RVA(WORD*, currentModuleBase, exportDir->AddressOfNameOrdinals);
+	DWORD* remoteFuncRvaBase = RESOLVE_RVA(DWORD*, currentModuleBase, exportDir->AddressOfFunctions);
 
-	for(int i = 0; i < exportDir->NumberOfNames;i++)
+
+	string exportNameIterator;
+	WORD funcOrdinal = 0;
+	DWORD remoteFuncRva = 0;
+
+	int i = 0;
+	for(i = 0; i< exportDir->AddressOfNames;i++)
 	{
-		string currentExportFuncName = string(RESOLVE_RVA(char*, currentRemoteExportDir->GetContent(), (nameIterator[i]) - offsetToRemoteExportDir));
-		if(currentExportFuncName == funcName)
+		exportNameIterator = importProcess->GetRemProcInstance()->ReadAnsiString(RESOLVE_RVA(void*,currentModuleBase, importProcess->GetRemProcInstance()->ReadDword(remoteFuncNameBase + i)), 60);
+		if (exportNameIterator == funcName)
 		{
-			WORD* ordinalBase = RESOLVE_RVA(WORD*, currentRemoteExportDir->GetContent(), exportDir->AddressOfNameOrdinals - offsetToRemoteExportDir);
-			//first get the correct ordinal entry
-			DWORD ordinalIndex = ordinalBase[i];
-			DWORD* remoteFuncAddress = RESOLVE_RVA(DWORD*, currentRemoteExportDir->GetContent(), exportDir->AddressOfFunctions - offsetToRemoteExportDir);
-			funcAddress = RESOLVE_RVA(BITDYNAMIC*, currentModuleBase, remoteFuncAddress[ordinalIndex]);
+			break;
 		}
 	}
-	return funcAddress;
+	funcOrdinal = importProcess->GetRemProcInstance()->ReadWord(remoteOrdinalBase + i);
+	remoteFuncRva = importProcess->GetRemProcInstance()->ReadDword(remoteFuncRvaBase + funcOrdinal);
+	//check for a forwarded export
+	if(RESOLVE_RVA(BITDYNAMIC, currentModuleBase, remoteFuncRva) > currentExportDirBase
+		&& RESOLVE_RVA(void*, currentModuleBase, remoteFuncRva) < RESOLVE_RVA(void*, currentExportDirBase, currentRemoteExportDir->GetBufferSize()))
+	{
+		cout << "Forwarded export found " << exportNameIterator << endl;
+
+		exportNameIterator = importProcess->GetRemProcInstance()->ReadAnsiString(RESOLVE_RVA(void*, currentModuleBase, remoteFuncRva), 60);
+		string dllnameArg = "";
+		string FuncNameArg = "";
+		dllnameArg = exportNameIterator.substr(0, exportNameIterator.find('.')) + ".dll";
+		FuncNameArg = exportNameIterator.substr(exportNameIterator.find('.') + 1, string::npos);
+		return GetProcAddress(dllnameArg, FuncNameArg);
+	}
+	return RESOLVE_RVA(BITDYNAMIC*, currentModuleBase, remoteFuncRva);
 }
 
 BITDYNAMIC* ProcAddressExtractor::GetProcAddress(string moduleName, int ordinal)

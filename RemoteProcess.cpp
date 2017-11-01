@@ -144,6 +144,17 @@ byte* RemoteProcess::ReadBuffer(void* readAddress, int bufferSize)
 	}
 	return ret;
 }
+
+WORD RemoteProcess::ReadWord(void* readAddress)
+{
+	CheckOpened();
+	WORD ret = 0;
+	byte* readBuffer = nullptr;
+	readBuffer = ReadBuffer(readAddress, sizeof(WORD));
+	ret = *(reinterpret_cast<WORD*>(readBuffer));
+	free(readBuffer);
+	return ret;
+}
 #pragma endregion
 
 #pragma region Write Values
