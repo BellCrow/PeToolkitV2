@@ -207,7 +207,16 @@ void* RemoteProcess::AllocSection(int sectionSize, DWORD sectionPermission)
 	return ret;
 }
 
-HANDLE RemoteProcess::CreateThread(void* startAddress, int arg)
+void RemoteProcess::FreeSection(void* sectionAddress)
+{
+	CheckOpened();
+	if(VirtualFreeEx(processHandle,sectionAddress,0,MEM_RELEASE) == 0)
+	{
+		throw string("Error while freeing a section in the remote process");
+	}
+}
+
+HANDLE RemoteProcess::CreateThread(void* startAddress, BITDYNAMIC arg)
 {
 	CheckOpened();
 	return CreateRemoteThread(processHandle,

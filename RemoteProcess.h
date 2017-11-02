@@ -48,6 +48,7 @@ public:
 	
 	#pragma region Allocation	
 	void* AllocSection(int sectionSize, DWORD sectionPermission);
+	void FreeSection(void* sectionAddress);
 	#pragma endregion
 
 	#pragma region remote Threading

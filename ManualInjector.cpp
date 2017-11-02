@@ -21,7 +21,7 @@ void ManualInjector::InjectDll(DllOnDisk*& dllToInject)
 
 #ifdef _WIN64
 	byte bootStrapper[] =
-	{ 0x50, 0x48, 0x89, 0xC8, 0x51, 0x52, 0x41, 0x51, 0x41, 0x52, 0x48, 0x8B, 0x08, 0x48, 0x8B, 0x50, 0x08, 0x4C, 0x8B, 0x48, 0x10, 0x48, 0x8B, 0x40, 0x18, 0x48, 0x83, 0xEC, 0x20, 0xFF, 0xD0, 0xC3 };
+	{ 0x48, 0x89, 0xC8, 0x4C, 0x8B, 0x00, 0x48, 0x8B, 0x50, 0x08, 0x48, 0x8B, 0x48, 0x10, 0x48, 0x83, 0xEC, 0x28, 0xFF, 0x50, 0x18, 0x48, 0xC7, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x48, 0x83, 0xC4, 0x28, 0xC3 };
 	int bootStrapSize = sizeof(bootStrapper);
 #else
 	byte bootStrapper[] =
@@ -66,12 +66,13 @@ void ManualInjector::InjectDll(DllOnDisk*& dllToInject)
 
 	if(bootStrapData.DllMainAddress != nullptr)	
 	{
-		HANDLE bootThreadHandle = remImage->GetRemProcInstance()->CreateThread(reinterpret_cast<byte*>(bootStrapSection) + sizeof(bootStrapData) + 20, reinterpret_cast<int>(bootStrapSection));
+		HANDLE bootThreadHandle = remImage->GetRemProcInstance()->CreateThread(reinterpret_cast<byte*>(bootStrapSection) + sizeof(bootStrapData) + 20, reinterpret_cast<BITDYNAMIC>(bootStrapSection));
 
 		WaitForSingleObject(bootThreadHandle, INFINITE);
 		DWORD retCode = 0;
 		GetExitCodeThread(bootThreadHandle, &retCode);
-		cout << "InjectionThread terminating with Return Code:" << retCode << endl;
+		remImage->GetRemProcInstance()->FreeSection(bootStrapSection);
+		cout << "InjectionThread terminating with Return Code:" << hex << retCode << endl;
 	}
 	//everything seemed to have been working out.add the injected dll into the known module bases
 	//we use the name, that is also used to export stuff, as thats whats important.

@@ -15,7 +15,7 @@ ProcAddressExtractor::~ProcAddressExtractor()
 BITDYNAMIC* ProcAddressExtractor::GetProcAddress(string moduleName, string funcName)
 {
 	//check if the desired image is already loaded
-	if((currentModuleBase = reinterpret_cast<int>(importProcess->GetRemoteModuleBase(moduleName))) == -1)
+	if((currentModuleBase = reinterpret_cast<BITDYNAMIC>(importProcess->GetRemoteModuleBase(moduleName))) == -1)
 	{
 		//cannot get address as module is not loaded
 		return 0;
